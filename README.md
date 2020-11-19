@@ -129,3 +129,125 @@ Increments by one everytime it is clicked.
 ```html
 @@html: <script-block state='{"count":0}'><!-- return html`<button onclick=${() => save({ count: this.count + 1 })}>${this.count ?? 0}`; --></script-block>@@
 ```
+
+## RSS page
+
+RSS page which fetches content when a "Refresh" button is clicked. The contents are fetched at a given interval.
+
+```markdown
+---
+title: RSS
+---
+
+## @@html: <button onclick="Function(document.getElementById('refresh-rss-feed').innerHTML)()()">Refresh</button>@@
+<script id="refresh-rss-feed">
+return async function(forceRefresh) {
+  document.querySelector("a[href^='/file/pages']").click();
+
+  const title = document.querySelector("h1.title").innerText;
+
+  document.getElementById(title).click();
+
+  const textarea = document.getElementById(title),
+        now = new Date()
+  let md = textarea.value;
+
+  const feeds = [...md.matchAll(/^### (\[(.+?)\]\((.+?)\)\s*\nSCHEDULED: <([\d-]+) \w+ ([\d:]+)) \.\+(\d+)(\w)>\n(?:<!-- REGEXP: \/(.+?)\/ -->\n)?/gm)].flatMap((match) => {
+    const date = new Date(match[4] + " " + match[5]),
+          title = match[2],
+          url = match[3],
+          interval = match[6],
+          unit = match[7],
+          intervalMultiplier = { h: 3600, d: 3600*24, w: 3600*24*7, m: 3600*24*30, y: 3600*24*365 }[unit],
+          [re, selector] = (match[8] ?? "(.+)/$1").split("/");
+
+    return { title, url, date, interval: interval * intervalMultiplier * 1000, toReplace: match[1], re: new RegExp(re), selector };
+  });
+
+  const items = [...md.matchAll(/^### <([\d-: ]+)> (.+?): \[(.+)\]\((.+)\)\n/gm)].map((match) => match[0]);
+
+  for (const feed of feeds) {
+    if (!forceRefresh && feed.date.valueOf() > now.valueOf()) {
+      continue;
+    }
+
+    const f = window.fetchNoCors ?? window.fetch;
+    const data = await f(feed.url)
+        .then((x) => x.text())
+        .then((x) => new DOMParser().parseFromString(x, "application/xml"));
+    const feedItems = [];
+
+    if (data.firstElementChild.tagName === "feed") {
+      for (const item of data.querySelectorAll("entry")) {
+        const title = item.querySelector("title").textContent,
+              url = item.querySelector("link").getAttribute("href"),
+              date = new Date(item.querySelector("updated").textContent);
+
+        feedItems.push({ title, url, date });
+      }
+    } else {
+      for (const item of data.querySelectorAll("item")) {
+        const title = item.querySelector("title").textContent,
+              url = item.querySelector("link").textContent,
+              date = new Date(item.querySelector("pubDate, date").textContent);
+        feedItems.push({ title, url, date });
+      }
+    }
+
+    for (const { title, url, date } of feedItems) {
+      const selectedTitle = title.replace(feed.re, feed.selector),
+            markdown = `### <${date.toISOString().replace("T", " ").replace(/:\d{2}\..+$/, "")}> [[${feed.title}]]: [${selectedTitle}](${url})\n`;
+
+      if (items.indexOf(markdown) === -1) {
+        items.push(markdown);
+      }
+    }
+
+    let nextDate = feed.date.valueOf();
+    while (nextDate < now) {
+      nextDate += feed.interval;
+    }
+    const next = new Date(nextDate);
+    const nextString = `<${next.toISOString().substr(0, 10)} ${next.toDateString().substr(0, 3)} ${next.getHours()}:${next.getMinutes()}`
+
+    md = md.replace(feed.toReplace, feed.toReplace.substr(0, feed.toReplace.indexOf("<")) + nextString);
+  }
+
+  items.sort().reverse();
+
+  textarea.value = md.slice(0, md.indexOf("##" + " Items")) + "##" + " Items\n" + items.slice(0, 50).join("");
+  await new Promise(r => setTimeout(r, 100));
+  textarea.dispatchEvent(new KeyboardEvent("keydown", { keyCode: 27 }));
+
+  document.querySelector("a[href^='/page']").click();
+};
+</script>
+## Feeds
+### [XKCD](https://xkcd.com/atom.xml) 
+SCHEDULED: <2020-11-21 Sat 11:0 .+2d>
+### [The Rust Blog](https://blog.rust-lang.org/feed.xml) 
+SCHEDULED: <2020-11-20 Fri 17:0 .+1d>
+<!-- REGEXP: /^Announcing // -->
+## Items
+### <2020-11-19 00:00> [[The Rust Blog]]: [Rust 1.48.0](https://blog.rust-lang.org/2020/11/19/Rust-1.48.html)
+### <2020-11-18 00:00> [[XKCD]]: [Blair Witch](https://xkcd.com/2387/)
+```
+
+To bypass CORS, I use the following [ViolentMonkey](https://github.com/violentmonkey/violentmonkey) script:
+```js
+// ==UserScript==
+// @match       https://logseq.com/*
+// @grant       GM_xmlhttpRequest
+// @inject-into page
+// ==/UserScript==
+
+unsafeWindow.fetchNoCors = (url) => new Promise((resolve, reject) => GM_xmlhttpRequest({
+  url,
+  method: 'GET',
+
+  onabort: () => reject(),
+  onerror: () => reject(),
+
+  onloadend: (res) => resolve({ async text() { return res.responseText; } }),
+}));
+```
