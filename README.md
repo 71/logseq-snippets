@@ -5,6 +5,7 @@ It's a little hacky because Logseq queries cannot return pages, so we must
 make them look like blocks manually.
 
 ```clojure
+@@html: <div style="display:none">@@
 #+BEGIN_QUERY
 {:title "Recent"
  :query [:find (pull ?p [*])
