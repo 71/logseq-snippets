@@ -47,60 +47,11 @@ make them look like blocks manually.
 
 This is a WebComponent that executes its content as JavaScript.
 
+First, import it:
+
 ```html
 <style onload="Function(this.innerHTML.slice(2, this.innerHTML.length - 2))()">/*
-import("https://cdn.skypack.dev/htl").then(({ html, svg }) => {
-
-class ScriptBlock extends HTMLElement {
-  constructor() {
-    super();
-
-    const stateJson = this.getAttribute("state") ?? "{}",
-          state = JSON.parse(stateJson);
-    const saveState = (x = state) => {
-      const json = JSON.stringify(x),
-            block = this.closest("[blockid]"),
-            blockId = block.getAttribute("blockid");
-
-      requestAnimationFrame(() => {
-        const textarea = document.getElementById("edit-block-1-" + blockId),
-              escaped = json.replace(/&/g, "&amp;").replace(/'/g, "&apos;")
-                            .replace(/</g, "&lt;").replace(/>/g, "&gt;")
-                            .replace(/\r\n/g, "&#13;").replace(/[\r\n]/g, "&#13;");
-
-        textarea.value = textarea.value.replace(
-          /(<script-block state=').+('>)/,
-          (_, before, after) => before + escaped + after,
-        );
-        setTimeout(() =>
-          textarea.dispatchEvent(new KeyboardEvent("keydown", { keyCode: 27 }))
-        , 100);
-      });
-      block.click();
-    };
-
-    const body = this.innerHTML.slice(4, this.innerHTML.length - 3),
-          f = Function("save", "html", "svg", body),
-          content = f.call(state, saveState, html, svg),
-          shadow = this.attachShadow({mode: 'open'});
-
-    if (content instanceof Node) {
-      shadow.appendChild(content);
-    } else {
-      const wrapper = document.createElement("pre");
-      wrapper.innerText = JSON.stringify(content);
-      shadow.appendChild(wrapper);
-    }
-
-    this.addEventListener(
-      "click",
-      (e) => e.stopImmediatePropagation(),
-    );
-  }
-}
-
-customElements.define("script-block", ScriptBlock);
-});
+import("https://cdn.jsdelivr.net/gh/71/logseq-snippets@main/script-block.js")
 */</style>
 ```
 
@@ -123,12 +74,36 @@ the Git repository.
 
 For an example, see the [counter](#counter).
 
-## Counter
+### Counter
 
 Increments by one everytime it is clicked.
 
 ```html
 @@html: <script-block state='{"count":0}'><!-- return html`<button onclick=${() => save({ count: this.count + 1 })}>${this.count ?? 0}`; --></script-block>@@
+```
+
+## The `<define-script-block>` element
+
+This is a WebComponent used to define reusable `<script-block>` elements. For instance, let's implement
+the [counter](#counter) again!
+
+### Reusable counter
+
+Put this anywhere:
+
+```html
+<define-script-block name="x-counter"><!--
+  return html`
+    <button onclick=${() => save({ count: +this.count + 1 })}>
+      ${this.count}
+  `;
+--></define-script-block>
+```
+
+And use it like this:
+
+```html
+@@html: <x-counter count="0"></x-counter>@@
 ```
 
 ## RSS page
