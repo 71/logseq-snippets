@@ -3,8 +3,7 @@ import { html, svg } from "https://cdn.skypack.dev/htl";
 const elements = new Map();
 
 export function defineElement(name, render) {
-  let elementClass = elements.get(name),
-      updateExisting = true;
+  let elementClass = elements.get(name);
 
   if (elementClass === undefined) {
     elementClass = class extends HTMLElement {
@@ -25,7 +24,6 @@ export function defineElement(name, render) {
 
     elements.set(name, elementClass);
     customElements.define(name, elementClass);
-    updateExisting = false;
   }
 
   elementClass.prototype.render = function() {
@@ -72,9 +70,6 @@ export function defineElement(name, render) {
 
     this._shadow.appendChild(content);
   };
-
-  if (!updateExisting)
-    return;
 
   for (const existingElement of document.querySelectorAll(name)) {
     existingElement.render();
