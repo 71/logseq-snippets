@@ -2,6 +2,85 @@ import { html, svg } from "https://cdn.skypack.dev/htl";
 
 const elements = new Map();
 
+export function defineElement(name, render) {
+  let elementClass = elements.get(name),
+      updateExisting = true;
+
+  if (elementClass === undefined) {
+    elementClass = class extends HTMLElement {
+      constructor() {
+        super();
+
+        this._shadow = this.attachShadow({ mode: "open" });
+        this.render();
+
+        this.addEventListener(
+          "click",
+          (e) => e.stopImmediatePropagation(),
+        );
+      }
+
+      render() {}
+    };
+
+    elements.set(name, elementClass);
+    customElements.define(name, elementClass);
+    updateExisting = false;
+  }
+
+  elementClass.prototype.render = function() {
+    this._shadow.innerHTML = "";
+
+    const htmlBefore = this.outerHTML,
+          state = {};
+
+    for (const attr of this.attributes) {
+      let value = attr.value;
+      if (value[0] === "{")
+        value = JSON.parse(value);
+      state[attr.name] = value;
+    }
+
+    const saveState = (x = state) => {
+      for (const name in x) {
+        let value = x[name];
+        if (typeof value === "object")
+          value = JSON.stringify(value);
+        this.setAttribute(name, value);
+      }
+
+      const htmlAfter = this.outerHTML,
+            block = this.closest("[blockid]"),
+            blockId = block.getAttribute("blockid");
+
+      requestAnimationFrame(() => {
+        const textarea = document.getElementById("edit-block-1-" + blockId);
+
+        textarea.value = textarea.value.replace(htmlBefore, htmlAfter);
+        setTimeout(() => {
+          textarea.dispatchEvent(new KeyboardEvent("keydown", { keyCode: 27 }));
+        }, 100);
+      });
+      block.click();
+    };
+
+    let content = render.call(state, saveState, html, svg);
+
+    if (!(content instanceof Node)) {
+      content = Object.assign(document.createElement("pre"), { innerText: content });
+    }
+
+    this._shadow.appendChild(content);
+  };
+
+  if (!updateExisting)
+    return;
+
+  for (const existingElement of document.querySelectorAll(name)) {
+    existingElement.render();
+  }
+}
+
 class ScriptBlock extends HTMLElement {
   constructor() {
     super();
@@ -57,82 +136,10 @@ class DefineScriptBlock extends HTMLElement {
     super();
 
     const name = this.getAttribute("name"),
-          pattern = this.getAttribute("pattern") ?? `(<${name} state=').+('/?>)`,
-          patternRe = new RegExp(pattern);
-    let elementClass = elements.get(name);
-
-    if (elementClass === undefined) {
-      elementClass = class extends HTMLElement {
-        constructor() {
-          super();
-
-          this._shadow = this.attachShadow({ mode: "open" });
-          this.render();
-
-          this.addEventListener(
-            "click",
-            (e) => e.stopImmediatePropagation(),
-          );
-        }
-
-        render() {}
-      };
-
-      elements.set(name, elementClass);
-      customElements.define(name, elementClass);
-    }
-
-    const body = this.innerHTML.slice(4, this.innerHTML.length - 3),
+          body = this.innerHTML.slice(4, this.innerHTML.length - 3),
           render = new Function("save", "html", "svg", body);
 
-    elementClass.prototype.render = function() {
-      this._shadow.innerHTML = "";
-
-      const htmlBefore = this.outerHTML,
-            state = {};
-
-      for (const attr of this.attributes) {
-        let value = attr.value;
-        if (value[0] === "{")
-          value = JSON.parse(value);
-        state[attr.name] = value;
-      }
-
-      const saveState = (x = state) => {
-        for (const name in x) {
-          let value = x[name];
-          if (typeof value === "object")
-            value = JSON.stringify(value);
-          this.setAttribute(name, value);
-        }
-
-        const htmlAfter = this.outerHTML,
-              block = this.closest("[blockid]"),
-              blockId = block.getAttribute("blockid");
-
-        requestAnimationFrame(() => {
-          const textarea = document.getElementById("edit-block-1-" + blockId);
-
-          textarea.value = textarea.value.replace(htmlBefore, htmlAfter);
-          setTimeout(() => {
-            textarea.dispatchEvent(new KeyboardEvent("keydown", { keyCode: 27 }));
-          }, 100);
-        });
-        block.click();
-      };
-
-      let content = render.call(state, saveState, html, svg);
-
-      if (!(content instanceof Node)) {
-        content = Object.assign(document.createElement("pre"), { innerText: content });
-      }
-
-      this._shadow.appendChild(content);
-    };
-
-    for (const existingElement of document.querySelectorAll(name)) {
-      existingElement.render();
-    }
+    defineElement(name, render);
   }
 }
 
