@@ -106,6 +106,15 @@ And use it like this:
 @@html: <x-counter count="0"></x-counter>@@
 ```
 
+Alternatively to `<define-script-block>`:
+
+```html
+<style onload="Function(this.innerHTML.slice(2, this.innerHTML.length - 2))()">/*
+import("https://cdn.jsdelivr.net/gh/71/logseq-snippets@main/script-block.js")
+  .then(({ defineElement }) => defineElement("x-counter", ({ save, html, count }) => html`<a onclick=${() => save({ count: +count + 1 })}>${count}`))
+*/</style>
+```
+
 ## RSS page
 
 RSS page which fetches content when a "Refresh" button is clicked. The contents are fetched at a given interval.
