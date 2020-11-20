@@ -236,3 +236,47 @@ unsafeWindow.fetchNoCors = (url) => new Promise((resolve, reject) => GM_xmlhttpR
   onloadend: (res) => resolve({ async text() { return res.responseText; } }),
 }));
 ```
+
+## Execution scripts
+
+I use the following script to execute JS scripts automatically.
+
+```js
+const watchedElements = [];
+const observer = new MutationObserver((mutationsList) => {
+  for (const mutation of mutationsList) {
+    if (mutation.target.classList.contains("extensions__code") &&
+        mutation.target.firstChild.textContent === "js,run") {
+      const code = mutation.target.children[1].value,
+            dispose = Function(code)();
+
+      if (typeof dispose === "function") {
+        watchedElements.push([mutation.target, dispose]);
+      }
+    } else if (mutation.removedNodes.length === 1) {
+      const removedNode = mutation.removedNodes[0];
+
+      for (const [watchedElement, dispose] of watchedElements) {
+        if (removedNode.contains(watchedElement)) {
+          dispose();
+        }
+      }
+    }
+  }
+});
+
+observer.observe(
+  document.getElementById("main-content-container"),
+  { subtree: true, childList: true },
+);
+```
+
+And then:
+
+````markdown
+```js,run
+console.log("Script loaded.");
+
+return () => console.log("Script unloaded.");
+```
+````
