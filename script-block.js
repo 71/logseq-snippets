@@ -32,7 +32,7 @@ export function defineElement(name, render) {
     this._shadow.innerHTML = "";
 
     const htmlBefore = this.outerHTML,
-          state = {};
+          state = { html, svg };
 
     for (const attr of this.attributes) {
       let value = attr.value;
@@ -41,7 +41,7 @@ export function defineElement(name, render) {
       state[attr.name] = value;
     }
 
-    const saveState = (x = state) => {
+    state.save = (x = state) => {
       for (const name in x) {
         let value = x[name];
         if (typeof value === "object")
@@ -64,7 +64,7 @@ export function defineElement(name, render) {
       block.click();
     };
 
-    let content = render.call(state, saveState, html, svg);
+    let content = render(state);
 
     if (!(content instanceof Node)) {
       content = Object.assign(document.createElement("pre"), { innerText: content });
@@ -139,7 +139,7 @@ class DefineScriptBlock extends HTMLElement {
           body = this.innerHTML.slice(4, this.innerHTML.length - 3),
           render = new Function("save", "html", "svg", body);
 
-    defineElement(name, render);
+    defineElement(name, ({ save, html, svg, ...state }) => render.call(state, save, html, svg));
   }
 }
 
