@@ -2,7 +2,7 @@
   const objectHash = await import("https://esm.run/object-hash").then(() => window.objectHash),
         f = window.fetchNoCors ?? window.fetch,
         hash = new URL(import.meta.url).hash.slice(1);
-  let refreshEvery = 1_000 /* ms */;
+  let refreshEvery = 60_000 /* ms */;
 
   if (/interval=(\d+)/.exec(hash)) {
     refreshEvery = +RegExp.$1;
