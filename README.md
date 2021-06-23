@@ -115,107 +115,48 @@ import("https://cdn.jsdelivr.net/gh/71/logseq-snippets@main/script-block.js")
 */</style>
 ```
 
-## RSS page
+## [`update-rss.js`](./update-rss.js)
 
-RSS page which fetches content when a "Refresh" button is clicked. The contents are fetched at a given interval.
+This script can be loaded in Logseq to automatically update a page named "RSS".
 
-```markdown
+It must contain two top-level items. One must start with "Feeds", and contains "feed descriptions."
+The other must start with "Items", and will contain the feed items.
+
+For instance:
+
+```md
 ---
 title: RSS
 ---
 
-## @@html: <button onclick="Function(document.getElementById('refresh-rss-feed').innerHTML)()()">Refresh</button>@@
-<script id="refresh-rss-feed">
-return async function(forceRefresh) {
-  document.querySelector("a[href^='/file/pages']").click();
+- Feeds ( <a onclick="import('https://cdn.jsdelivr.net/gh/71/logseq-snippets/update-rss.js#interval=0')">Refresh</a> )
+	- [The Pudding](https://pudding.cool/feed/index.xml) 
+	  SCHEDULED: <2021-06-24 Thu 11:0 .+1d>
+	- [XKCD](https://xkcd.com/atom.xml) 
+	  SCHEDULED: <2021-06-25 Fri 12:0 .+2d>
+	- [The Rust Blog](https://blog.rust-lang.org/feed.xml) 
+	  SCHEDULED: <2021-06-24 Thu 18:0 .+1d>
+	  <!-- REGEXP: /^Announcing // -->
+- Items
+	- <2021-06-21 00:00> [[XKCD]]: [Houseguests](https://xkcd.com/2479/)
+```
 
-  const title = document.querySelector("h1.title").innerText;
+If you use [ViolentMonkey](https://github.com/violentmonkey/violentmonkey), you can load the script on start-up and
+tell it to refresh its data every e.g. 60,000ms:
 
-  document.getElementById(title).click();
+```js
+// ==UserScript==
+// @match       https://logseq.com/
+// @grant       none
+// ==/UserScript==
 
-  const textarea = document.getElementById(title),
-        now = new Date()
-  let md = textarea.value;
+import("https://cdn.jsdelivr.net/gh/71/logseq-snippets/update-rss.js#interval=60000")
+```
 
-  const feeds = [...md.matchAll(/^### (\[(.+?)\]\((.+?)\)\s*\nSCHEDULED: <([\d-]+) \w+ ([\d:]+)) \.\+(\d+)(\w)>\n(?:<!-- REGEXP: \/(.+?)\/ -->\n)?/gm)].flatMap((match) => {
-    const date = new Date(match[4] + " " + match[5]),
-          title = match[2],
-          url = match[3],
-          interval = match[6],
-          unit = match[7],
-          intervalMultiplier = { h: 3600, d: 3600*24, w: 3600*24*7, m: 3600*24*30, y: 3600*24*365 }[unit],
-          [re, selector] = (match[8] ?? "(.+)/$1").split("/");
+Loading it with the `force` parameter will reload all feeds, even if their `SCHEDULED` time hasn't been reached yet, e.g.
 
-    return { title, url, date, interval: interval * intervalMultiplier * 1000, toReplace: match[1], re: new RegExp(re), selector };
-  });
-
-  const items = [...md.matchAll(/^### <([\d-: ]+)> (.+?): \[(.+)\]\((.+)\)\n/gm)].map((match) => match[0]);
-
-  for (const feed of feeds) {
-    if (!forceRefresh && feed.date.valueOf() > now.valueOf()) {
-      continue;
-    }
-
-    const f = window.fetchNoCors ?? window.fetch;
-    const data = await f(feed.url)
-        .then((x) => x.text())
-        .then((x) => new DOMParser().parseFromString(x, "application/xml"));
-    const feedItems = [];
-
-    if (data.firstElementChild.tagName === "feed") {
-      for (const item of data.querySelectorAll("entry")) {
-        const title = item.querySelector("title").textContent,
-              url = item.querySelector("link").getAttribute("href"),
-              date = new Date(item.querySelector("updated").textContent);
-
-        feedItems.push({ title, url, date });
-      }
-    } else {
-      for (const item of data.querySelectorAll("item")) {
-        const title = item.querySelector("title").textContent,
-              url = item.querySelector("link").textContent,
-              date = new Date(item.querySelector("pubDate, date").textContent);
-        feedItems.push({ title, url, date });
-      }
-    }
-
-    for (const { title, url, date } of feedItems) {
-      const selectedTitle = title.replace(feed.re, feed.selector),
-            markdown = `### <${date.toISOString().replace("T", " ").replace(/:\d{2}\..+$/, "")}> [[${feed.title}]]: [${selectedTitle}](${url})\n`;
-
-      if (items.indexOf(markdown) === -1) {
-        items.push(markdown);
-      }
-    }
-
-    let nextDate = feed.date.valueOf();
-    while (nextDate < now) {
-      nextDate += feed.interval;
-    }
-    const next = new Date(nextDate);
-    const nextString = `<${next.toISOString().substr(0, 10)} ${next.toDateString().substr(0, 3)} ${next.getHours()}:${next.getMinutes()}`
-
-    md = md.replace(feed.toReplace, feed.toReplace.substr(0, feed.toReplace.indexOf("<")) + nextString);
-  }
-
-  items.sort().reverse();
-
-  textarea.value = md.slice(0, md.indexOf("##" + " Items")) + "##" + " Items\n" + items.slice(0, 50).join("");
-  await new Promise(r => setTimeout(r, 100));
-  textarea.dispatchEvent(new KeyboardEvent("keydown", { keyCode: 27 }));
-
-  document.querySelector("a[href^='/page']").click();
-};
-</script>
-## Feeds
-### [XKCD](https://xkcd.com/atom.xml) 
-SCHEDULED: <2020-11-21 Sat 11:0 .+2d>
-### [The Rust Blog](https://blog.rust-lang.org/feed.xml) 
-SCHEDULED: <2020-11-20 Fri 17:0 .+1d>
-<!-- REGEXP: /^Announcing // -->
-## Items
-### <2020-11-19 00:00> [[The Rust Blog]]: [Rust 1.48.0](https://blog.rust-lang.org/2020/11/19/Rust-1.48.html)
-### <2020-11-18 00:00> [[XKCD]]: [Blair Witch](https://xkcd.com/2387/)
+```js
+import("https://cdn.jsdelivr.net/gh/71/logseq-snippets/update-rss.js#force")
 ```
 
 To bypass CORS, I use the following [ViolentMonkey](https://github.com/violentmonkey/violentmonkey) script:
