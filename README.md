@@ -1,3 +1,21 @@
+## Loading scripts from this repository
+A few scripts are exported from this repository. To load them within a page, you can use
+
+```js
+// For update-rss.js
+import("https://cdn.jsdelivr.net/gh/71/logseq-snippets/update-rss.js")
+```
+
+Since you shouldn't trust random scripts you load from the internet, you should specify
+the hash of the last commit you looked at, e.g.
+
+```js
+// For update-rss.js
+import("https://cdn.jsdelivr.net/gh/71/logseq-snippets@de5c4a035657dd96a91252d189fb2d0aed6261b3/update-rss.js")
+```
+
+Note that you can't directly link to GitHub (via `?raw=true`), since the MIME type wouldn't be correct.
+
 ## Fake "Recent" block in `Contents.md`
 This will render a block-like list with all the recently modified pages.
 
@@ -159,6 +177,7 @@ Loading it with the `force` parameter will reload all feeds, even if their `SCHE
 import("https://cdn.jsdelivr.net/gh/71/logseq-snippets/update-rss.js#force")
 ```
 
+### CORS
 To bypass CORS, I use the following [ViolentMonkey](https://github.com/violentmonkey/violentmonkey) script:
 ```js
 // ==UserScript==
